@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2024-06-05 23:50'
+    echo_msg['determine_basal.py'] = '2024-11-02 00:51'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -275,7 +275,7 @@ def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, Flo
             else:
                 console_error("Loop allows medium power")
                 return "enforced"                                           # even number
-    console_error("Loop allows APS opower level")
+    console_error("Loop allows APS power level")
     return "AAPS"                                                           # leave it to standard AAPS
         
 def capInsulin(insulinReq, myTarget, myBg, insulinCap, Flows):
@@ -389,7 +389,7 @@ def withinISFlimits(liftISF, minISFReduction, maxISFReduction, sensitivityRatio,
         if (liftISF >= sensitivityRatio) :
             origin_sens = ""                                    #// autoISF dominates
         else :
-            origin_sens = "from low TT modifier";               #// low TT lowers sensitivity dominates
+            origin_sens = " from low TT modifier";              #// low TT lowers sensitivity dominates
     else :
         final_ISF = min(liftISF, sensitivityRatio)
         if (liftISF <= sensitivityRatio):       origin_sens = ""
@@ -850,7 +850,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             sensitivityRatio = min(sensitivityRatio, profile['autosens_max'])
             sensitivityRatio = round(sensitivityRatio,2)
             exercise_ratio = sensitivityRatio
-            origin_sens = "from TT modifier"
+            origin_sens = " from TT modifier"
             if gz_proto:
                 console_error("Sensitivity ratio set to "+str(sensitivityRatio)+" based on full/half/TT of "+str(fullBasalTarget)+"/"+str(halfBasalTarget)+"/"+str(target_bg)+";")
                 Flows.append(dict(title="Sensitivity ratio set to "+str(sensitivityRatio)+"\nbased on full/half/TT of "+str(fullBasalTarget)+"/"+str(halfBasalTarget)+"/"+str(target_bg), indent='1', adr='140-xx'))
@@ -859,12 +859,12 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
                 Flows.append(dict(title="Sensitivity ratio set to "+str(short(sensitivityRatio))+"\nbased on temp target of "+str(target_bg), indent='1', adr='140-xx'))
         elif ( stepActivityDetected ) :
             sensitivityRatio = activityRatio
-            origin_sens = "from activity detection"
+            origin_sens = " from activity detection"
             #//console_error("Sensitivity ratio set to "+str(sensitivityRatio)+" based on activity detection")
             Flows.append(dict(title="Sensitivity ratio set to "+str(sensitivityRatio)+"\nbased on activity detection", indent='1', adr='140-xx'))
         elif ( stepInactivityDetected ) :
             sensitivityRatio = activityRatio
-            origin_sens = "from inactivity detection";
+            origin_sens = " from inactivity detection";
             #//console_error("Sensitivity ratio set to "+str(sensitivityRatio)+" based on inactivity detection");
             Flows.append(dict(title="Sensitivity ratio set to "+str(sensitivityRatio)+"\nbased on inactivity detection", indent='1', adr='140-xx'))
     elif ( typeof(autosens_data) != 'undefined'  and autosens_data):
@@ -926,6 +926,9 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     
     if ('activity' not in iob_data or 'iob' not in iob_data ):
         rT['error'] ='Error: iob_data missing some property. '
+        print(str(iob_data))
+        for ele in iob_data:
+            print('found element', ele)
         return rT
 
     #tick;
@@ -1364,8 +1367,14 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         for iobTick in iobArray :
             icount += 1             #### position in iobArry; to flag where minima were found
             #//console_error(iobTick);
-            predBGI = round(( -iobTick['activity'] * sens * 5 ), 2)
-            predZTBGI = round(( -iobTick['iobWithZeroTemp']['activity'] * sens * 5 ), 2)
+            if 'activity' in iobTick:
+                predBGI = round(( -iobTick['activity'] * sens * 5 ), 2)
+            else:
+                predBGI = 0         # disappeared from json in 3.3-dev
+            if 'activity' in iobTick['iobWithZeroTemp']:
+                predZTBGI = round(( -iobTick['iobWithZeroTemp']['activity'] * sens * 5 ), 2)
+            else:
+                predZTBGI = 0       # disappeared from json in 3.3-dev
             #// for IOBpredBGs, predicted deviation impact drops linearly from current deviation down to zero
             #// over 60 minutes (data points every 5m)
             predDev = ci * ( 1 - min(1,len(IOBpredBGs)/(60/5)) )
@@ -1454,6 +1463,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
     except: # catch *all* exceptions
         e = sys.exc_info()[0]
         console_error("Problem with iobArray.  Optional feature Advanced Meal Assist disabled:"+str(e))
+        console_error('pred loop count:'+str(icount), str(iobTick))
 
     #### all initial predictions done and finalised
     Fcasts['COBinitBGs'] = copy.deepcopy(COBpredBGs)
@@ -2166,7 +2176,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             SMBInterval = SMBInterval * 60
             #//console_error(naive_eventualBG, insulinReq, worstCaseInsulinReq, durationReq);
             console_error("naive_eventualBG "+str(naive_eventualBG)+", "+str(durationReq)+"m "+str(smbLowTempReq)+"U/h temp needed; last bolus "+str(short(round(lastBolusAge/60,1)))+"m ago; maxBolus:", maxBolus)
-            if (lastBolusAge > SMBInterval - 6) :     #// 6s tolerance
+            if (lastBolusAge > SMBInterval - 12) :     #// to be 6s tolerance but released as 12s
                 if (microBolus > 0) :
                     rT['units'] = microBolus
                     rT['reason'] += "Microbolusing " + str(short(microBolus)) + "U. "
